@@ -16,7 +16,7 @@ runs-on: self-hosted
     - mongodb
 3. mxh-stack
     - backend:
-        - currently in python
+        - currently in python & rust
         - mxh-db
             - mongodb
         - mxh-auth
