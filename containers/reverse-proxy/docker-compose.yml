@@ -1,0 +1,39 @@
+services:
+
+  caddy:
+    build:
+      context: ./caddy
+
+    container_name: caddy
+
+    ports:
+      # - "80:80"
+      - "443:443/tcp"
+      - "443:443/udp"
+
+    environment:
+      CF_API_TOKEN: ${CF_API_TOKEN}
+
+    volumes:
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+
+
+  ddns:
+
+    build:
+      context: ./ddns
+
+    container_name: ddns
+
+    environment:
+      CF_API_TOKEN: ${CF_API_TOKEN}
+
+    volumes:
+      - ./ddns/config:/config
+
+
+volumes:
+  caddy_data:
+  caddy_config:
