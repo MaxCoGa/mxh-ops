@@ -1,0 +1,17 @@
+{
+    email admin@marxh.net
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+    storage file_system /data
+}
+
+nginx3.marxh.net {
+
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+    }
+
+    encode gzip
+
+    root * /srv/hello
+    file_server
+}
