@@ -16,11 +16,19 @@ if [ -z "${CF_API_TOKEN:-}" ]; then
     exit 1
 fi
 
+safe_curl() {
+    local response
+    response=$(curl -fsSL "$@" 2>&1) || {
+        echo "CURL_ERROR:$response"
+        return 0
+    }
+    echo "$response"
+}
 
 get_public_ip() {
-    IP=$(curl -4 -fsSL --max-time 10 https://api.ipify.org || true)
+    IP=$(safe_curl -4 --max-time 10 https://api.ipify.org)
 
-    if [ -z "$IP" ] || [ "$IP" = "0.0.0.0" ]; then
+    if [[ "$IP" == "CURL_ERROR:"* ]] || [ -z "$IP" ] || [ "$IP" = "0.0.0.0" ]; then
         echo ""
     else
         echo "$IP"
@@ -116,17 +124,23 @@ do
 
 
     if [ -z "$IP" ]; then
-        echo "Could not determine public IP, retrying..."
+        echo "Could not determine public IP, retrying in 60s..."
         sleep 60
         continue
     fi
 
 
-    CURRENT_RESPONSE=$(curl -fsSL \
+    CURRENT_RESPONSE=$(safe_curl \
         -H "Authorization: Bearer ${CF_API_TOKEN}" \
         -H "Content-Type: application/json" \
         "${CF_API}/zones/${ZONE_ID}/dns_records/${RECORD_ID}")
 
+    if [[ "$CURRENT_RESPONSE" == "CURL_ERROR:"* ]]; then
+        echo "Cloudflare API error occurred (e.g. 521 Server Error). Retrying in 60s..."
+        echo "${CURRENT_RESPONSE#CURL_ERROR:}"
+        sleep 60
+        continue
+    fi
 
     CURRENT=$(echo "$CURRENT_RESPONSE" | jq -r '.result.content // empty')
 
@@ -136,7 +150,7 @@ do
         echo "Updating ${HOSTNAME}: ${CURRENT} -> ${IP}"
 
 
-        UPDATE_RESPONSE=$(curl -fsSL -X PUT \
+        UPDATE_RESPONSE=$(safe_curl -X PUT \
             "${CF_API}/zones/${ZONE_ID}/dns_records/${RECORD_ID}" \
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
@@ -148,6 +162,11 @@ do
                 \"proxied\":false
             }")
 
+        if [[ "$UPDATE_RESPONSE" == "CURL_ERROR:"* ]]; then
+            echo "Failed to connect to Cloudflare during update. Retrying in 60s..."
+            sleep 60
+            continue
+    	fi
 
         SUCCESS=$(echo "$UPDATE_RESPONSE" | jq -r '.success')
 
